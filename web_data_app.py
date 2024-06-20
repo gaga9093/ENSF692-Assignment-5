@@ -1,94 +1,86 @@
 # web_data_app.py
 # June 2024
-# Modified by: STUDENT NAME
+# Modified by: Alireza Ghasemi
 #
 # An simple program for demonstrating web applications using Flask and web scraping of data using Beautiful Soup.
 # Detailed specifications are provided via the Assignment 5 README file.
 
 
-import pandas as pd     # needed for data manipulation
-
-from flask import Flask, render_template    # needed for web app
-
-from bs4 import BeautifulSoup               # needed for web scraping
+from flask import Flask, render_template, jsonify
+import pandas as pd
+import logging
+import os
+from bs4 import BeautifulSoup
 import requests
 
-from datetime import datetime               # needed for time/regular expressions
-import re
-
-
-###
-# Initialize our FLASK application object from the Flask class like so:
-app = Flask(__name__)
+# Explicitly specify the templates folder
+app = Flask(__name__, template_folder=r'C:\ENSF 692\Assignments\A5\ENSF692-Assignment5\templates')
+logging.basicConfig(level=logging.DEBUG)
 
 @app.route("/")
 def index():
-    """
-    Our first (topmost) route (aka 'view').  Routes are like URLs, 
-    which we can access from a browser. The line immediately below is known as a 
-    'decorator' and implements some boilerplate code for us without much work on 
-    our end.  Basically it creates a 'view' to our app and data to show the user.
-    This one merely shows a static message.  Easy-peasy.
-    """
     return "Hello World!"
-
 
 @app.route("/hello/<name>")
 def hello_there(name):
-    """
-    This route shows a bit more of what we can do, including some 'REST'full user 
-    interaction.  If a user specifies a name in the url like so: http://localhost:5000/hello/supercoder
-    the response will include the value 'supercoder' in the `name` variable, and 
-    can then be validated with the RE `match_object` output.  If an invalid value is specified
-    for `name` the validator code will simply assign 'friend' value to the `clean_name`
-    instead.  If no value is specified, it will error out and present a 404 error to the browser.
-    """
+    from datetime import datetime
+    import re
+
     now = datetime.now()
     formatted_now = now.strftime("%A, %d %B, %Y at %X")
 
-    # Filter the name argument to letters only using regular expressions. URL arguments
-    # can contain arbitrary text, so we restrict to safe characters only.
     match_object = re.match("[a-zA-Z]+", name)
     if match_object:
         clean_name = match_object.group(0)
     else:
         clean_name = "Friend"
 
-    # Output the semi-static text with the time and supplied name (if any)
     content = "Hello there, " + clean_name + "! Welcome to Assignment 5. It's " + formatted_now
     return content
 
-
 @app.route("/data")
 def book_data():
-    """
-    Now let's take what we learned about Pandas and scrap some data from the internet!
-    """
+    try:
+        logging.debug("Starting book data route")
+        logging.debug(f"Current working directory: {os.getcwd()}")
+        template_path = os.path.join(app.template_folder, 'template.html')
+        logging.debug(f"Template path: {template_path}")
+        logging.debug(f"Template exists: {os.path.exists(template_path)}")
+        
+        source = requests.get("http://books.toscrape.com/")
+        logging.debug("Fetched source data")
+        
+        soup = BeautifulSoup(source.content, 'html.parser')
+        logging.debug("Parsed HTML content with BeautifulSoup")
+        
+        book_results = soup.find_all(attrs={'class': 'product_pod'})
+        logging.debug("Found all book results")
 
-    # Web scraping can be against the Terms of Use. 
-    # Always check to make sure that you are web scraping legally and ethically.
-    # The following site was specifically created to practice web scraping.
-    source = requests.get("http://books.toscrape.com/")
-    soup = BeautifulSoup(source.content, 'html.parser')     # Use BeautifulSoup to parse the website html code
-    book_results = soup.find_all(attrs={'class':'product_pod'})  # By inspecting the site, we know books = product_pod class
+        titles = []
+        prices = []
 
-    titles = []
-    prices = []
+        for book in book_results:
+            titles.append(book.h3.a.get('title'))
+            prices.append(float(book.find('p', class_="price_color").text[1:]))
 
-    # For each book listed on the page, get the title and the price from inside in the html data
-    for book in book_results:
-        titles.append(book.h3.a.get('title'))
-        prices.append(float(book.find('p', class_="price_color").text[1:]))
+        logging.debug(f"Extracted titles: {titles}")
+        logging.debug(f"Extracted prices: {prices}")
 
-    # Create a DataFrame using the two lists
-    book_data = pd.DataFrame(list(zip(titles, prices)), columns=['Titles','Prices'])    
-    print(book_data)        # Print to the terminal as confirmation - only we can see this
+        book_data = pd.DataFrame(list(zip(titles, prices)), columns=['Titles', 'Prices'])
+        book_data['Sale Prices'] = book_data['Prices'] * 0.75  # Reduced by 25%
 
-    # Format and print the DataFrame using the html template provided in the templates subdirectory
-    return render_template('template.html',  tables=[book_data.to_html(classes='data')], titles=book_data.columns.values)
+        logging.debug("Created DataFrame successfully")
+        logging.debug(book_data)
+
+        return render_template('template.html', tables=[book_data.to_html(classes='data')], titles=book_data.columns.values)
+    
+    except Exception as e:
+        logging.error("Error occurred in /data route", exc_info=True)
+        return jsonify(error=str(e)), 500
 
 @app.route("/learn")
 def learn():
-    # Return a string the describes one thing you learned in ENSF 692.
-    pass
+    return "I learned how to build a web application using Flask."
 
+if __name__ == '__main__':
+    app.run(debug=True)
