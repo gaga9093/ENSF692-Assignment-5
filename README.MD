@@ -1,4 +1,16 @@
 # ENSF 692 Spring 2024 - Assignment 5
+Below are the screenshots:
+
+![Example screenshot](Run1.png)
+
+![Example screenshot](Run2.png)
+
+![Example screenshot](Run3.png)
+
+![Example screenshot](Run4.png)
+
+![Example screenshot](Run5.png)
+
 
 ## 📚 Learning Outcomes
 * Create a simple Flask application with multiple routes
